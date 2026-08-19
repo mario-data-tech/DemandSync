@@ -1,0 +1,65 @@
+version: "3.9"
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: demandsync_api
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      DATABASE_URL: postgresql://demandsync:demandsync@postgres:5432/demandsync
+      REDIS_URL: redis://redis:6379/0
+      ENV: production
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    volumes:
+      - ./data:/app/data
+    networks:
+      - demandsync_net
+
+  postgres:
+    image: postgres:16-alpine
+    container_name: demandsync_postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: demandsync
+      POSTGRES_PASSWORD: demandsync
+      POSTGRES_DB: demandsync
+    ports:
+      - "5432:5432"
+    volumes:
+      - demandsync_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U demandsync -d demandsync"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - demandsync_net
+
+  redis:
+    image: redis:7-alpine
+    container_name: demandsync_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - demandsync_net
+
+volumes:
+  demandsync_pgdata:
+
+networks:
+  demandsync_net:
+    driver: bridge
